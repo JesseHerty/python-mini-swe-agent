@@ -1,0 +1,74 @@
+name: sphinx
+
+on:
+  # Triggers the workflow on push or pull request events but only for the "master" branch
+  push:
+    branches: ["master"]
+  pull_request:
+    branches: ["master"]
+  # Or manually from the Actions tab
+  workflow_dispatch:
+
+# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+
+jobs:
+  build_docs:
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libjpeg-dev \
+            libpng-dev \
+            libtiff-dev \
+            libfreetype6-dev \
+            libtcl8.6 \
+            libtk8.6 \
+            python3-tk \
+            libx11-dev \
+            libxml2-dev \
+            libxslt1-dev \
+            libhdf5-dev \
+            libopenblas-dev
+      - uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.14"
+          allow-prereleases: true
+      - name: Install uv
+        run: python -m pip install uv
+      - name: Sync project dependencies
+        run: uv sync --group docs
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: Build Sphinx HTML documentation
+        run: uv run sphinx-build -b html -c docs . docs/_build/html
+      - name: Upload GitHub Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs/_build/html
+
+  deploy_docs:
+    needs: build_docs
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
